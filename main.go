@@ -69,8 +69,6 @@ func LoadCSV(path string) (*DataTable, error) {
 		y: []float32{},
 	}
 
-	rowXs := []float32{}
-
 	// we assume that the last column is the target column
 	// and the rest are the features
 	// we will convert the data to float32
@@ -80,6 +78,7 @@ func LoadCSV(path string) (*DataTable, error) {
 	// TODO how to handle missing values?
 	// for each row
 	for i, record := range records {
+		rowXs := []float32{}
 
 		if i == 0 && !keepFirstRow {
 			continue
@@ -88,7 +87,7 @@ func LoadCSV(path string) (*DataTable, error) {
 		// fmt.Println("record:", record)
 		// for each column
 		for colIndex, value := range record {
-			fmt.Printf("%s\t", value)
+			// fmt.Printf("%s\t", value)
 
 			if colIndex == targetColumn {
 				y, err := strconv.ParseFloat(value, 32)
@@ -185,18 +184,20 @@ func (t *Tree) Fit(X [][]float32, y []float32) {
 	// Copy X
 	for i, row := range X {
 		// dt.X[i] = make([]float32, len(row))
-		dt.X = append(dt.X, make([]float32, len(row)))
-		copy(dt.X[i], row)
+		// dt.X = append(dt.X, make([]float32, len(row)))
+		// copy(dt.X[i], row)
+		dt.X = append(dt.X, row)
+		dt.y = append(dt.y, y[i])
 	}
 	// Copy y
-	dt.y = make([]float32, len(y))
-	copy(dt.y, y)
+	// dt.y = make([]float32, len(y))
+	// copy(dt.y, y)
 	// are the ys continuous or discrete?
 	// if continuous, we are doing regression
 	// if discrete, we are doing classification
 
 	// shuffle the order
-	shuffle(dt.X, dt.y)
+	dt.X, dt.y = shuffle(dt.X, dt.y)
 
 	isDiscrete := true
 	classCounts := make(map[float32]int)
@@ -206,13 +207,14 @@ func (t *Tree) Fit(X [][]float32, y []float32) {
 		classCounts[dt.y[i]]++
 
 		// check if the y values are discrete
-		if y[i] != float32(int(dt.y[i])) {
+		if dt.y[i] != float32(int(dt.y[i])) {
 			isDiscrete = false
 			// break
 		}
 	}
-
 	fmt.Println("isDiscrete", isDiscrete)
+	fmt.Println("classCounts", classCounts)
+	// TODO if classes are un-balanced, we may need to balance them?
 
 	// split the data into k folds
 	k := 5
@@ -229,53 +231,74 @@ func (t *Tree) Fit(X [][]float32, y []float32) {
 	}
 }
 
-func shuffle(X [][]float32, y []float32) {
+func shuffle(X [][]float32, y []float32) ([][]float32, []float32) {
 	// Seed the random number generator for reproducibility
 	// rand.Seed(0)  // time.Now().UnixNano())
 
 	// Create a permutation of indices
-	n := len(y)
-	permutation := rand.Perm(n)
+	n_rows := len(y)
+	permutation := rand.Perm(n_rows)
+
+	// n_cols := len(X[0])
 
 	// Shuffle X and y according to the permutation
-	shuffledX := make([][]float32, n)
-	shuffledY := make([]float32, n)
+	shuffledX := make([][]float32, n_rows)
+	shuffledY := make([]float32, n_rows)
 	for i, j := range permutation {
-		shuffledX[i] = X[j]
-		shuffledY[i] = y[j]
+		srcX := X[j]
+		srcY := y[j]
+		// shuffledX = append(shuffledX, srcX)
+		// shuffledY = append(shuffledY, srcY)
+		shuffledX[i] = srcX
+		shuffledY[i] = srcY
 	}
 
 	// Replace original X and y with shuffled versions
-	copy(X, shuffledX)
-	copy(y, shuffledY)
+	// copy(X, shuffledX)
+	// copy(y, shuffledY)
+	return shuffledX, shuffledY
 }
 
 // SplitData splits the data into k-folds for cross-validation
 func SplitData(data DataTable, k int) []DataTable {
-	// rand.Seed(time.Now().UnixNano())
+	n_rows := len(data.y)
+	// n_cols := len(data.X[0])
+	folds := make([]DataTable, k)
+	// n_folds_rows := n_rows / k
 
-	// Create a slice of DataTables to hold the folds
-	// type DataTable struct {X [][]float32; y []float32 }
-
-	totalRows := len(data.y)
-
-	// Shuffle the data indices
-	// indices := rand.Perm(len(data.y))
-	indices := make([]int, totalRows)
-	fmt.Println("indices:", indices)
-
-	for i := 0; i < totalRows; i++ {
-		fmt.Println("i:", i)
-		randIndex := rand.Intn(k)
-		indices[i] = randIndex
+	// Initialize empty folds
+	for i := range folds {
+		folds[i] = DataTable{
+			X: [][]float32{},
+			y: []float32{},
+		}
 	}
 
-	// Create a slice of DataTables to hold the folds
-	folds := make([]DataTable, k)
+	// Create shuffled indices
+	indices := rand.Perm(n_rows)
 
-	// Split the data into k folds
-	// copy DataTable.X into filds[indices[i]].X
-	// copy DataTable.y into filds[indices[i]].y
+	// Distribute data points into folds
+	for i, idx := range indices {
+		foldIndex := i % k
+
+		srcX := data.X[idx]
+		srcY := data.y[idx]
+
+		// Append data point to appropriate fold
+		folds[foldIndex].X = append(folds[foldIndex].X, srcX)
+		folds[foldIndex].y = append(folds[foldIndex].y, srcY)
+
+		// folds[foldIndex].X[i] = make([]float32, len(srcX))
+		// folds[foldIndex].X[i] = srcX
+		// folds[foldIndex].y[i] = srcY
+	}
+
+	// print first row of each fold
+	for i := 0; i < k; i++ {
+		fmt.Print("Fold:", i)
+		fmt.Print(", X:", folds[i].X[0])
+		fmt.Println(", y:", folds[i].y[0])
+	}
 
 	return folds
 }
