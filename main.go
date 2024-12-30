@@ -92,6 +92,28 @@ func (t *Tree) Print() {
 	fmt.Println("n_estimators:", t.n_estimators)
 	fmt.Println("max_depth:", t.max_depth)
 
+	// print the tree
+	t.printTree(t.Root, 0)
+
+}
+
+func (t *Tree) printTree(node *TreeNode, depth int) {
+	if node == nil {
+		return
+	}
+
+	// print the node
+	spaces := ""
+	for i := 0; i < depth; i++ {
+		spaces += "  "
+	}
+	fmt.Println(spaces+"Depth:", depth, "Node:", node)
+	fmt.Println(spaces+"FeatureIndex:", node.FeatureIndex)
+	fmt.Println(spaces+"Threshold:", node.Threshold)
+
+	// print the children
+	t.printTree(node.Left, depth+1)
+	t.printTree(node.Right, depth+1)
 }
 
 // Predict is a method that makes predictions using the decision tree model
