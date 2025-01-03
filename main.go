@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 )
 
 func main() {
@@ -19,6 +20,8 @@ func main() {
 	tree := TreeNew()
 	tree.Fit(trainData.X, trainData.y)
 	tree.Print()
+
+	tree.SaveToDotFile("my_tree.dot")
 
 	score := tree.Score(testData.X, testData.y)
 	fmt.Println("Score:", score)
@@ -71,22 +74,6 @@ func TreeNew() *Tree {
 	return &tree
 }
 
-// New is a method that creates a new decision tree model
-// With default values for n_estimators and max_depth
-// func TreeFromCSV(path string) *Tree {
-// 	tree := TreeNew()
-
-// 	// load from csv
-// 	dt, err := LoadCSV(path)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-
-// 	// fit the tree
-// 	tree.Fit(dt.X, dt.y)
-// 	return tree
-// }
-
 func (t *Tree) Print() {
 	fmt.Println("Tree:", t)
 	fmt.Println("n_estimators:", t.n_estimators)
@@ -95,6 +82,15 @@ func (t *Tree) Print() {
 	// print the tree
 	t.printTree(t.Root, 0)
 
+}
+
+func (t *Tree) SaveToDotFile(path string) {
+	dotFileContent := t.ToDotFile()
+	err := os.WriteFile(path, []byte(dotFileContent), 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Wrote tree to:", path)
 }
 
 func (t *Tree) printTree(node *TreeNode, depth int) {
@@ -110,10 +106,59 @@ func (t *Tree) printTree(node *TreeNode, depth int) {
 	fmt.Println(spaces+"Depth:", depth, "Node:", node)
 	fmt.Println(spaces+"FeatureIndex:", node.FeatureIndex)
 	fmt.Println(spaces+"Threshold:", node.Threshold)
+	fmt.Println(spaces+"Prediction:", node.Prediction)
+	fmt.Println(spaces+"IsLeaf:", node.IsLeaf)
+	fmt.Println(spaces+"SampleCount:", node.SampleCount)
+	fmt.Println(spaces+"Impurity:", node.Impurity)
+	fmt.Println(spaces+"ClassCountsSummary:", node.ClassCountsSummary)
 
 	// print the children
 	t.printTree(node.Left, depth+1)
 	t.printTree(node.Right, depth+1)
+}
+
+// ToDotFile generates the content of a Graphviz dot file representing the decision tree.
+func (t *Tree) ToDotFile() string {
+	dot := "digraph Tree {\n"
+	// node [shape=box, style="filled, rounded", color="black", fontname="helvetica"] ;
+	// edge [fontname="helvetica"] ;
+	dot += "node [shape=\"box\", style=\"rounded\", fontname=\"helvetica\"];\n"
+	dot += "edge [fontname=\"helvetica\"];\n"
+	t.addNodeToDot(t.Root, &dot, 0)
+	dot += "}\n"
+	return dot
+}
+
+func (t *Tree) addNodeToDot(node *TreeNode, dot *string, nodeID int) int {
+	if node == nil {
+		return nodeID
+	}
+
+	label := ""
+	// TODO only show classCounts if discrete and fewer than some number like 10 maybe
+	if node.IsLeaf {
+		label = fmt.Sprintf("Prediction: %v\\nSamples: %d\\nClassCounts: %s",
+			node.Prediction, node.SampleCount, node.ClassCountsSummary)
+	} else {
+		label = fmt.Sprintf("Feature: %d\\nThreshold: %.2f\\nSamples: %d\\nClassCounts: %s",
+			node.FeatureIndex, node.Threshold, node.SampleCount, node.ClassCountsSummary)
+	}
+	*dot += fmt.Sprintf("  node%d [label=\"%s\"];\n", nodeID, label)
+
+	// maybe the left label, instead of True, should be something like F2 < 3.00
+	leftID := nodeID + 1
+	if node.Left != nil {
+		*dot += fmt.Sprintf("  node%d -> node%d [labeldistance=2.5, labelangle=45, headlabel=\"True\"];\n", nodeID, leftID)
+		leftID = t.addNodeToDot(node.Left, dot, leftID)
+	}
+
+	// maybe the left label, instead of False, should be something like F2 >= 3.00
+	rightID := leftID + 1
+	if node.Right != nil {
+		*dot += fmt.Sprintf("  node%d -> node%d [labeldistance=2.5, labelangle=-45, headlabel=\"False\"];\n", nodeID, leftID)
+		t.addNodeToDot(node.Right, dot, leftID)
+	}
+	return rightID
 }
 
 // Predict is a method that makes predictions using the decision tree model
@@ -149,6 +194,8 @@ func (t *Tree) Score(X [][]float32, y []float32) float32 {
 			correct++
 		}
 	}
+
+	fmt.Println("Score: correct", correct, "of", len(y))
 
 	accuracy := float32(correct) / float32(len(y))
 	return accuracy
@@ -267,22 +314,27 @@ type TreeNode struct {
 	Depth       int
 	SampleCount int
 	Impurity    float32
+
+	// Class counts for debugging
+	ClassCountsSummary string
 }
 
 // NewTreeNode is a method that creates a new tree node
 func NewTreeNode() *TreeNode {
-	return &TreeNode{
-		FeatureIndex: -1,
-		Threshold:    0.0,
-		Left:         nil,
-		Right:        nil,
-		Parent:       nil,
-		Prediction:   0.0,
-		IsLeaf:       false,
-		Depth:        0,
-		SampleCount:  0,
-		Impurity:     0.0,
+	node := &TreeNode{
+		FeatureIndex:       -1,
+		Threshold:          0.0,
+		Left:               nil,
+		Right:              nil,
+		Parent:             nil,
+		Prediction:         0.0,
+		IsLeaf:             false,
+		Depth:              0,
+		SampleCount:        0,
+		Impurity:           0.0,
+		ClassCountsSummary: "",
 	}
+	return node
 }
 
 // Tree_ID3 is a method that trains a decision tree using the ID3 algorithm
@@ -292,6 +344,18 @@ func Tree_ID3(dt DataTable, max_depth int, isDiscrete bool) *TreeNode {
 	root.SampleCount = len(dt.y)
 	root.Depth = 0
 	root.Impurity = Gini(dt.y) // or Entropy(dt.y)
+	entropy := Entropy(dt.y)
+	fmt.Println("Entropy:", entropy, "Gini:", root.Impurity)
+
+	classCounts := make(map[float32]int)
+	for _, class := range dt.y {
+		classCounts[class]++
+	}
+	classCountStr := ""
+	for class, count := range classCounts {
+		classCountStr += fmt.Sprintf("%v:%v ", class, count)
+	}
+	root.ClassCountsSummary = classCountStr
 
 	// Check if we need to stop splitting
 	if root.Depth >= max_depth || root.Impurity == 0.0 {
@@ -436,6 +500,7 @@ func Impurity(left []float32, right []float32) float32 {
 // leftData, rightData := SplitData(dt, bestSplit.FeatureIndex, bestSplit.Threshold)
 func SplitData(dt DataTable, featureIndex int, threshold float32) (DataTable, DataTable) {
 	// Split a dataset into two parts
+	// left child: X < threshold, right child: X >= threshold
 	leftData := DataTable{
 		X: [][]float32{},
 		y: []float32{},

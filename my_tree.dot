@@ -1,0 +1,29 @@
+digraph Tree {
+node [shape="box", style="rounded", fontname="helvetica"];
+edge [fontname="helvetica"];
+  node0 [label="Feature: 2\nThreshold: 3.00\nSamples: 120\nClassCounts: 0:50 2:20 1:50 "];
+  node0 -> node1 [labeldistance=2.5, labelangle=45, headlabel="True"];
+  node1 [label="Prediction: 0\nSamples: 50\nClassCounts: 0:50 "];
+  node0 -> node3 [labeldistance=2.5, labelangle=-45, headlabel="False"];
+  node3 [label="Feature: 2\nThreshold: 5.00\nSamples: 70\nClassCounts: 1:50 2:20 "];
+  node3 -> node4 [labeldistance=2.5, labelangle=45, headlabel="True"];
+  node4 [label="Feature: 0\nThreshold: 5.00\nSamples: 49\nClassCounts: 1:48 2:1 "];
+  node4 -> node5 [labeldistance=2.5, labelangle=45, headlabel="True"];
+  node5 [label="Feature: 1\nThreshold: 2.50\nSamples: 2\nClassCounts: 2:1 1:1 "];
+  node5 -> node6 [labeldistance=2.5, labelangle=45, headlabel="True"];
+  node6 [label="Prediction: 1\nSamples: 1\nClassCounts: 1:1 "];
+  node5 -> node8 [labeldistance=2.5, labelangle=-45, headlabel="False"];
+  node8 [label="Prediction: 2\nSamples: 1\nClassCounts: 2:1 "];
+  node4 -> node9 [labeldistance=2.5, labelangle=-45, headlabel="False"];
+  node9 [label="Prediction: 1\nSamples: 47\nClassCounts: 1:47 "];
+  node3 -> node10 [labeldistance=2.5, labelangle=-45, headlabel="False"];
+  node10 [label="Feature: 3\nThreshold: 1.80\nSamples: 21\nClassCounts: 2:19 1:2 "];
+  node10 -> node11 [labeldistance=2.5, labelangle=45, headlabel="True"];
+  node11 [label="Feature: 1\nThreshold: 2.70\nSamples: 3\nClassCounts: 1:2 2:1 "];
+  node11 -> node12 [labeldistance=2.5, labelangle=45, headlabel="True"];
+  node12 [label="Prediction: 2\nSamples: 1\nClassCounts: 2:1 "];
+  node11 -> node14 [labeldistance=2.5, labelangle=-45, headlabel="False"];
+  node14 [label="Prediction: 1\nSamples: 2\nClassCounts: 1:2 "];
+  node10 -> node15 [labeldistance=2.5, labelangle=-45, headlabel="False"];
+  node15 [label="Prediction: 2\nSamples: 18\nClassCounts: 2:18 "];
+}
