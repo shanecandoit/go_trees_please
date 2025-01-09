@@ -107,9 +107,16 @@ func LoadCSV(path string) (*DataTable, error) {
 	return &dt, nil
 }
 
-func Shuffle(X [][]float32, y []float32) ([][]float32, []float32) {
+func Shuffle(X [][]float32, y []float32, seed *int) ([][]float32, []float32) {
 	// Seed the random number generator for reproducibility
 	// rand.Seed(0)  // time.Now().UnixNano())
+
+	// if seed is nil, generate a random seed
+	if seed == nil {
+		num := rand.Int()
+		seed = &num
+	}
+	rand.New(rand.NewSource(int64(*seed)))
 
 	// Create a permutation of indices
 	n_rows := len(y)
@@ -136,7 +143,7 @@ func Shuffle(X [][]float32, y []float32) ([][]float32, []float32) {
 }
 
 // SplitDataKParts splits the data into k-folds for cross-validation
-func SplitDataKParts(data DataTable, k int) []DataTable {
+func SplitDataKParts(data *DataTable, k int) []DataTable {
 	n_rows := len(data.y)
 	// n_cols := len(data.X[0])
 	folds := make([]DataTable, k)
